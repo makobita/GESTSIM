@@ -24,8 +24,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      # el Android SDK ya viene instalado en las máquinas de GitHub (ubuntu-latest)
 
       - name: Motor 3D (Three.js) dentro de la app
         run: curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js -o app/src/main/assets/three.min.js
