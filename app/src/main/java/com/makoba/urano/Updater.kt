@@ -24,7 +24,7 @@ import kotlin.concurrent.thread
 class Updater(private val act: AppCompatActivity, private val web: WebView) {
 
     companion object {
-        const val REPO = "makobitta/GESTSIM"
+        const val REPO = "makobita/GESTSIM"
         const val API = "https://api.github.com/repos/$REPO/releases/latest"
         const val PAGE = "https://github.com/$REPO/releases/latest"
     }
