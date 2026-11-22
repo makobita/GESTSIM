@@ -106,12 +106,15 @@ input[type=text]{flex:1;background:#0b0d12;color:#ffd84a;border:1px solid #3a3f4
   <div class="sec">
    <h2>PANTALLA</h2>
    <div class="cfgRow"><span>Datos de velocidades (izquierda)</span><button class="cfgT" data-k="hud">ON</button></div>
+   <div class="cfgRow"><span>Modo bajo rendimiento</span><button class="cfgT" data-k="low">ON</button></div>
+   <div class="cfgRow"><span>Mostrar FPS</span><button class="cfgT" data-k="fps">ON</button></div>
+   <div class="small">Bajo rendimiento: menos resolución, sin sombras, menos luces y humo. Al cambiarlo se recarga.</div>
   </div>
   <div class="sec">
    <h2>ACTUALIZAR <span class="led" id="updVer" style="min-width:0">—</span></h2>
    <div class="cfgRow"><span>Buscar al abrir</span><button class="cfgT" data-k="auto">ON</button></div>
    <div class="row"><button id="updCheck" style="flex:1">BUSCAR ACTUALIZACIÓN</button></div>
-   <div class="small" id="updMsg">Repositorio: makobitta/GESTSIM</div>
+   <div class="small" id="updMsg">Repositorio: makobita/GESTSIM</div>
    <div class="bar" id="updBarW" style="display:none;height:12px;margin-top:6px"><i id="updBar" style="width:0%"></i></div>
    <div class="row"><button id="updGo" class="on" style="flex:1;display:none">DESCARGAR E INSTALAR</button></div>
   </div>
@@ -234,11 +237,14 @@ const canvas=$('c');
 function showFatal(t){const st=document.getElementById('status');if(st){st.textContent='⚠ '+t;st.className='err';st.style.opacity=1;st.style.display='block';st.dataset.fatal=1;}}
 window.addEventListener('error',e=>showFatal('Error: '+(e.message||e)));
 {const ce=console.error.bind(console);console.error=(...a)=>{ce(...a);const t=a.map(String).join(' ');if(/shader|WebGL|program/i.test(t))showFatal('La tarjeta gráfica no puede con un efecto: '+t.slice(0,160));};}
+// MODO BAJO RENDIMIENTO (⚙): menos resolución, sin sombras ni antialias, menos luces y humo. En móvil viene activado.
+const IS_MOBILE=/Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
+const LOWP=(()=>{try{const c=JSON.parse(localStorage.getItem('gestsimCfg2')||'{}');if(c.low!==undefined)return !!c.low;}catch(e){}return IS_MOBILE;})();
 let renderer;
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(e){showFatal('Este aparato no tiene WebGL (gráficos 3D) disponible.');throw e;}
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:!LOWP,powerPreference:'high-performance'});}catch(e){showFatal('Este aparato no tiene WebGL (gráficos 3D) disponible.');throw e;}
 // modo ligero para móviles y gráficas pequeñas: menos luces y sombras más pequeñas
 const LITE=(()=>{try{const gl=renderer.getContext();return /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent)||gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)<1024;}catch(e){return true;}})();
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,LITE?1.25:2));
+renderer.setPixelRatio(LOWP?Math.min(window.devicePixelRatio||1,1)*(IS_MOBILE?0.8:1):Math.min(window.devicePixelRatio||1,LITE?1.25:2));
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x05061a);
 scene.fog=new THREE.FogExp2(0x05061a,0.0085);
@@ -251,7 +257,7 @@ window.addEventListener('resize',resize);
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();let n=0;try{n=+(sessionStorage.getItem('glReload')||0);sessionStorage.setItem('glReload',n+1);}catch(_){n=9;}if(n<2){showFatal('La tarjeta gráfica se ha reiniciado. Recargando…');setTimeout(()=>location.reload(),2500);}else showFatal('La tarjeta gráfica no aguanta la escena. Pulsa ⚙ y apaga las otras atracciones y el entorno, luego recarga.');});
 
 const hemi=new THREE.HemisphereLight(0x5a6ab0,0x121018,0.6);scene.add(hemi);
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=!LOWP;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const moon=new THREE.DirectionalLight(0x8899ff,0.35);moon.position.set(-30,50,25);moon.castShadow=true;moon.shadow.mapSize.set(LITE?1024:2048,LITE?1024:2048);
 Object.assign(moon.shadow.camera,{left:-32,right:32,top:32,bottom:-32,near:1,far:140});moon.shadow.bias=-0.0006;scene.add(moon);
 
@@ -455,7 +461,7 @@ g.position.set(x,DECK_T+PH1+0.04,z);rig.add(g);
     addBulb(mover,cx,cy,FD/2+0.05,'foco',FOCOS.length,(c*4+r)/8);}
    // orientar hacia el centro del plato
    {const tx=-x,tz=-z,ty=DECK_T+2.5-(DECK_T+PH1+0.04+3.7);aim.rotation.y=Math.atan2(tx,tz);tiltG.rotation.x=Math.atan2(-ty,Math.hypot(tx,tz));}
-   const sp=new THREE.SpotLight(0xfff2d8,6,70,0.62,0.55,0.7);sp.position.set(0,0,0.25);mover.add(sp);const tg=new THREE.Object3D();tg.position.set(0,0,10);mover.add(tg);sp.target=tg;
+   const sp=new THREE.SpotLight(0xfff2d8,6,70,0.62,0.55,0.7);sp.position.set(0,0,0.25);sp.visible=!LOWP;mover.add(sp);const tg=new THREE.Object3D();tg.position.set(0,0,10);mover.add(tg);sp.target=tg;
    // haz de luz visible que sale del foco
    const bGeo=new THREE.ConeGeometry(3.4,24,28,1,true);bGeo.translate(0,-12,0);bGeo.rotateX(-Math.PI/2);
    const bMat=new THREE.MeshBasicMaterial({color:0xffffff,map:BEAM_TEX,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
@@ -573,7 +579,7 @@ const heads=[];
   const tilt=new THREE.Group();tilt.position.y=0.42;pan.add(tilt);
   const body=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.24,0.5,18),hm);body.rotation.x=Math.PI/2;tilt.add(body);
   const lensM=new THREE.MeshBasicMaterial({color:0xffffff});const lens=new THREE.Mesh(new THREE.CircleGeometry(0.17,20),lensM);lens.position.z=0.26;tilt.add(lens);
-  const sp=new THREE.SpotLight(0xffffff,2,70,0.17,0.3,0.6);sp.position.z=0.3;tilt.add(sp);const tg=new THREE.Object3D();tg.position.z=10;tilt.add(tg);sp.target=tg;
+  const sp=new THREE.SpotLight(0xffffff,2,70,0.17,0.3,0.6);sp.position.z=0.3;sp.visible=!LOWP;tilt.add(sp);const tg=new THREE.Object3D();tg.position.z=10;tilt.add(tg);sp.target=tg;
   const bGeo=new THREE.ConeGeometry(1.6,30,24,1,true);bGeo.translate(0,-15,0);bGeo.rotateX(-Math.PI/2);
   const mat=new THREE.MeshBasicMaterial({color:0xffffff,map:BEAM_TEX,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
   const beam=new THREE.Mesh(bGeo,mat);beam.position.z=0.26;tilt.add(beam);
@@ -946,7 +952,7 @@ const TQ={pos:null,look:null};
  for(let k=0;k<6;k++){const b=new THREE.Mesh(new THREE.SphereGeometry(0.06,8,6),M(PAL[k],{emissive:PAL[k],emissiveIntensity:.8}));b.position.set(W/2-0.45,FL+0.95,-(D-0.9)/2+k*(D-0.9)/5);tq.add(b);}
  bx(W+0.8,0.25,D+0.8,tqW,0,FL+H+0.12,0);                                         // tejado
  bx(W+0.8,0.14,0.14,tqP,0,FL+H-0.02,D/2+0.4);bx(0.14,0.14,D+0.8,tqP,W/2+0.4,FL+H-0.02,0);
- const inside=new THREE.PointLight(0xfff0d0,0.8,8);inside.position.set(0,FL+2.4,0);tq.add(inside);
+ const inside=new THREE.PointLight(0xfff0d0,0.8,8);inside.position.set(0,FL+2.4,0);inside.visible=!LOWP;tq.add(inside);
  // cartel con el nombre de la atracción en el centro, debajo de la ventanilla, con luces alrededor
  const SW=2.3,SH=1.15,SY=FL+WB/2-0.05;
  const tqCv=document.createElement('canvas');tqCv.width=512;tqCv.height=256;const tqTex=new THREE.CanvasTexture(tqCv);
@@ -1218,7 +1224,7 @@ const sunTex=canvasTex(1024,1024,(g,w,h)=>{const cx=w/2,cy=h/2;const cols=['#ff4
   const tube=new THREE.Mesh(new THREE.TubeGeometry(path,NPLUMAS*8,0.03,8,true),NEON_MAT);discGroup.add(tube);
   let ni=0;for(let k=0;k<NPLUMAS;k++){const A=P[k],B=P[k+1];const n=Math.round(A.distanceTo(B)/0.22);for(let j=0;j<n;j++){const q=A.clone().lerp(B,j/n);addBulb(discGroup,q.x,q.y,q.z,'neon',ni++,0);}}
   // resplandor azul del neón: ilumina los bajos del plato y la plataforma cuando se acerca
-  const rN=RIN-0.8;for(let k=0;k<(LITE?0:6);k++){const a=(k+0.5)/6*Math.PI*2;const x=Math.cos(a)*rN,z=Math.sin(a)*rN;
+  const rN=RIN-0.8;for(let k=0;k<(LITE||LOWP?0:6);k++){const a=(k+0.5)/6*Math.PI*2;const x=Math.cos(a)*rN,z=Math.sin(a)*rN;
    const l=new THREE.SpotLight(0x3f7dff,0,6.5,1.25,0.9,2);l.position.set(x,-0.4,z);l.target.position.set(x,-3,z);discGroup.add(l);discGroup.add(l.target);NEON_LIGHTS.push(l);}}
  // filas radiales de luces sobre las franjas
  for(let s=0;s<NPLUMAS;s++){const a=s/NPLUMAS*Math.PI*2;for(let k=0;k<15;k++){const r=2.1+k*0.48;addBulb(discGroup,Math.cos(a)*r,__coneY(r)+0.2,Math.sin(a)*r,'plato',i++,(s+k/15)/NPLUMAS);}}
@@ -1479,22 +1485,22 @@ const bPoints=new THREE.Points(bGeo,bMat);bPoints.frustumCulled=false;bPoints.re
 
 
 /* ================= CONFIGURACIÓN Y ACTUALIZACIONES ================= */
-const CFG={r0:false,r1:false,r2:false,env:true,auto:true,hud:false};
+const CFG={r0:false,r1:false,r2:false,env:true,auto:true,hud:false,low:LOWP};
 try{Object.assign(CFG,JSON.parse(localStorage.getItem('gestsimCfg2')||'{}'));}catch(e){}
 function saveCfg(){try{localStorage.setItem('gestsimCfg2',JSON.stringify(CFG));}catch(e){}}
 function applyCfg(){
  OTHER_G.forEach((g,k)=>g.visible=!!CFG['r'+k]);
  if(PARK.objs)for(const o of PARK.objs)o.visible=CFG.env;
  if(PARK.asf){ground.material.map=CFG.env?PARK.asf:null;ground.material.needsUpdate=true;}
- $('hudInfo').style.display=CFG.hud?'':'none';
+ $('hudInfo').style.display=CFG.hud?'':'none';{const pd=document.getElementById('perfDiag');if(pd)pd.style.display=CFG.fps?'':'none';}
  document.querySelectorAll('.cfgT').forEach(b=>{const v=!!CFG[b.dataset.k];setOn(b,v);b.textContent=v?'ON':'OFF';});}
-document.querySelectorAll('.cfgT').forEach(b=>b.onclick=()=>{CFG[b.dataset.k]=!CFG[b.dataset.k];saveCfg();applyCfg();});
+document.querySelectorAll('.cfgT').forEach(b=>b.onclick=()=>{CFG[b.dataset.k]=!CFG[b.dataset.k];saveCfg();applyCfg();if(b.dataset.k==='low'){msg('Cambiando el modo de rendimiento…','');setTimeout(()=>location.reload(),400);}});
 $('cfgBtn').onclick=()=>{$('cfgModal').style.display='flex';$('cfgBtn').classList.remove('dot');};
 $('cfgClose').onclick=()=>$('cfgModal').style.display='none';
 $('cfgModal').addEventListener('click',e=>{if(e.target.id==='cfgModal')$('cfgModal').style.display='none';});
 applyCfg();
 // actualizaciones: en la app Android lo hace la parte nativa (GestSim); en navegador sólo avisa y enlaza
-const GH_REPO='makobitta/GESTSIM';const NATIVE=window.GestSim||null;let webApk=null;
+const GH_REPO='makobita/GESTSIM';const NATIVE=window.GestSim||null;let webApk=null;
 $('updVer').textContent=NATIVE?('v'+NATIVE.getVersion()):'web';
 function updUI(o,silent){const m=$('updMsg');$('updBarW').style.display=o.state==='progress'?'block':'none';
  $('updGo').style.display=(o.state==='available')?'block':'none';$('updCheck').disabled=(o.state==='checking'||o.state==='progress');
@@ -1523,7 +1529,7 @@ if(!NATIVE)$('updGo').textContent='DESCARGAR APK';
 if(NATIVE&&CFG.auto)setTimeout(()=>checkUpd(true),2500);
 
 /* ================= HUMO ================= */
-const SMK=(()=>{const N=3000;
+const SMK=(()=>{const N=LOWP?700:3000;
  const pos=new Float32Array(N*3),size=new Float32Array(N),alpha=new Float32Array(N);
  const vel=[],age=new Float32Array(N),life=new Float32Array(N);for(let i=0;i<N;i++){vel.push(V());age[i]=1e9;life[i]=1;pos[i*3+1]=-100;}
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('size',new THREE.BufferAttribute(size,1));geo.setAttribute('alpha',new THREE.BufferAttribute(alpha,1));
@@ -1711,6 +1717,9 @@ window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keyHeld[k]=false
 function approach(cur,tgt,rate,dt){const d=tgt-cur;const m=rate*dt;return Math.abs(d)<=m?tgt:cur+Math.sign(d)*m;}
 let last=performance.now(),T=0,uiT=0;
 const DIAG={f:0};
+{const d=document.createElement('div');d.id='perfDiag';d.style.cssText='position:absolute;left:6px;bottom:6px;z-index:40;font:12px monospace;color:#0f0;background:rgba(0,0,0,.7);padding:3px 6px;pointer-events:none';document.getElementById('view').appendChild(d);d.style.display=CFG.fps?'':'none';
+ let lf=0,lt=performance.now();setInterval(()=>{if(d.style.display==='none')return;const now=performance.now();const fps=(DIAG.f-lf)*1000/(now-lt);lf=DIAG.f;lt=now;let objs=0,meshes=0,lights=0;scene.traverse(o=>{objs++;if(o.isMesh)meshes++;if(o.isLight)lights++;});
+  const i=renderer.info;d.textContent='fps:'+fps.toFixed(1)+' calls:'+i.render.calls+' tris:'+(i.render.triangles/1000).toFixed(0)+'k objs:'+objs+' mesh:'+meshes+' lights:'+lights+' bulbs:'+bulbs.length+' prog:'+i.programs.length+' tex:'+i.memory.textures+' geo:'+i.memory.geometries;},1000);}
 function frame(now){{const v=$('view');if(v.clientWidth!==viewW||v.clientHeight!==viewH)resize();}const dt=Math.max(0,Math.min(0.05,((now||performance.now())-last)/1000))||0;last=now||performance.now();T+=dt;DIAG.f++;
  const run=canRun();
  // motores
@@ -1816,6 +1825,49 @@ function frame(now){{const v=$('view');if(v.clientWidth!==viewW||v.clientHeight!
   $('lPower').className='lamp'+(S.estop?' r':S.power?' g':'');$('lBars').className='lamp'+(S.barsClosed&&S.barsAnim<0.05?' g':S.barsClosed?' y':' r');}
 
  renderer.render(scene,camera);requestAnimationFrame(frame);}
+// ===== OPTIMIZACIÓN: une todas las piezas fijas en pocas mallas (de ~2100 llamadas de dibujo a unas pocas centenas) =====
+function optimizeScene(){
+ const t0=performance.now();
+ const dyn=new Set([armGroup,tiltGroup,discGroup,stars,pBarrel,pStage1,pStage2,pRing1,pRing2,...MAIN_DRIVE,...OTHER_G,...(PARK.objs||[])]);
+ for(const w of driveWheels)dyn.add(w.spin);
+ for(const st of seats){dyn.add(st.barPivot);for(const r of st.riders){dyn.add(r.g);dyn.add(r.head);for(const a of r.arms)dyn.add(a);}}
+ for(const h of HEADS){dyn.add(h.pan);dyn.add(h.tilt);dyn.add(h.beam);}
+ for(const f of FOCOS){dyn.add(f.mover);dyn.add(f.beam);}
+ for(const h of heads)dyn.add(h.pivot);
+ for(const o of [OTHER.wheel,OTHER.ship,OTHER.jailArm,OTHER.jailGond,...(OTHER.gond||[])])if(o)dyn.add(o);
+ const anchors=new Set(bulbs.map(b=>b.obj));
+ // materiales que el programa cambia en marcha: no se comparten
+ const keep=new Set([NEON_MAT,SIGN_MAT,ground.material,...NEON_GLOW]);
+ for(const f of FOCOS){keep.add(f.mat);keep.add(f.lampM);}for(const h of HEADS){keep.add(h.mat);keep.add(h.lensM);}for(const h of heads)keep.add(h.mat);
+ if(PARK.grass)keep.add(PARK.grass.material);
+ // 1) materiales iguales -> uno solo
+ const canon=new Map();const sig=m=>[m.type,m.color&&m.color.getHex(),m.emissive&&m.emissive.getHex(),m.emissiveIntensity,m.metalness,m.roughness,m.map&&m.map.uuid,m.emissiveMap&&m.emissiveMap.uuid,
+  m.transparent,m.opacity,m.side,m.flatShading,m.depthWrite,m.blending,m.alphaTest,m.polygonOffset,m.polygonOffsetFactor,m.polygonOffsetUnits,m.vertexColors,m.fog,m.wireframe,m.toneMapped].join('|');
+ scene.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||Array.isArray(o.material))return;const m=o.material;if(keep.has(m)||!(m.isMeshStandardMaterial||m.isMeshBasicMaterial))return;
+  const k=sig(m);const c=canon.get(k);if(c)o.material=c;else canon.set(k,m);});
+ // 2) aplanar: todas las mallas fijas de cada parte que se mueve junta -> una malla por material
+ const inv=new THREE.Matrix4(),mm=new THREE.Matrix4();let removed=0,made=0;
+ function flatten(root){root.updateMatrixWorld(true);inv.copy(root.matrixWorld).invert();const groups=new Map(),sub=[];
+  (function walk(o){for(const c of o.children){if(dyn.has(c)){sub.push(c);continue;}
+   if(c.isMesh&&!c.isInstancedMesh&&!c.isSkinnedMesh&&!Array.isArray(c.material)&&!anchors.has(c)&&c.visible&&c.geometry&&c.geometry.attributes.position&&!c.geometry.morphAttributes.position){
+    if(c.children.length)walk(c);
+    else{const k=c.material.uuid+'|'+(c.castShadow?1:0)+(c.receiveShadow?1:0)+'|'+c.renderOrder;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c);}}
+   else if(!c.isMesh&&!c.isPoints&&!c.isLine&&!c.isSprite)walk(c);}})(root);
+  for(const list of groups.values()){if(list.length<2)continue;let n=0;const parts=[];
+   for(const m of list){let g=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();mm.multiplyMatrices(inv,m.matrixWorld);g.applyMatrix4(mm);
+    if(mm.determinant()<0){for(const nm of['position','normal','uv']){const at=g.attributes[nm];if(!at)continue;const s=at.itemSize,A=at.array;for(let i=0;i+2<at.count;i+=3)for(let j=0;j<s;j++){const t=A[(i+1)*s+j];A[(i+1)*s+j]=A[(i+2)*s+j];A[(i+2)*s+j]=t;}}}
+    parts.push(g);n+=g.attributes.position.count;}
+   const P=new Float32Array(n*3),N=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
+   for(const g of parts){const c=g.attributes.position.count;P.set(g.attributes.position.array,o*3);if(g.attributes.normal)N.set(g.attributes.normal.array,o*3);if(g.attributes.uv&&g.attributes.uv.itemSize===2)U.set(g.attributes.uv.array,o*2);o+=c;g.dispose();}
+   const mg=new THREE.BufferGeometry();mg.setAttribute('position',new THREE.BufferAttribute(P,3));mg.setAttribute('normal',new THREE.BufferAttribute(N,3));mg.setAttribute('uv',new THREE.BufferAttribute(U,2));
+   const nm_=new THREE.Mesh(mg,list[0].material);nm_.castShadow=list[0].castShadow;nm_.receiveShadow=list[0].receiveShadow;nm_.renderOrder=list[0].renderOrder;
+   for(const m of list){m.parent.remove(m);removed++;}root.add(nm_);made++;}
+  for(const d of sub)flatten(d);}
+ flatten(scene);
+ // 3) los objetos fijos no recalculan su posición cada fotograma
+ scene.traverse(o=>{if(o.isMesh&&!dyn.has(o)){o.updateMatrix();o.matrixAutoUpdate=false;}});
+ console.log('optimizeScene',removed,'->',made,'mallas en',(performance.now()-t0).toFixed(0),'ms');}
+try{optimizeScene();}catch(e){console.warn('optimizeScene',e);}
 // MAPA DE ENTORNO para que los cromados reflejen (si no, el metal pulido se ve negro)
 {try{const envC=canvasTex(512,256,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#9fb4d8');gr.addColorStop(0.45,'#e8ecf4');gr.addColorStop(0.5,'#c9ccd2');gr.addColorStop(0.56,'#6d6f74');gr.addColorStop(1,'#3a3b3f');g.fillStyle=gr;g.fillRect(0,0,w,h);
    for(let k=0;k<26;k++){const x=Math.random()*w,y=h*0.3+Math.random()*h*0.18,r=4+Math.random()*10;const c=['#ff5fb4','#ffffff','#00e5ff','#ffe14a'][k%4];const rg=g.createRadialGradient(x,y,0,x,y,r);rg.addColorStop(0,c);rg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=rg;g.fillRect(x-r,y-r,r*2,r*2);}});
